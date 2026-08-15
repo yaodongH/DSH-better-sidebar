@@ -49,6 +49,9 @@ import { transform } from 'lightningcss'
 
 const require = createRequire(import.meta.url)
 
+/** uuid's environment-neutral ESM entry (mermaid imports `uuid`; see the chunk alias below). */
+const UUID_NEUTRAL = resolvePath(dirname(require.resolve('uuid/package.json')), 'dist/index.js')
+
 /** Node builtins must never survive into the browser module-loader factory. */
 const NODE_BUILTINS = new Set([
   ...builtinModules,
@@ -203,6 +206,11 @@ function chunkBundle(name: string): UserConfig {
         conditionNames: ['browser', 'import', 'require', 'default'],
       },
     },
+    // uuid is a mermaid dependency; its exports map resolves the node flavor
+    // (dist-node imports node:crypto, which the purity gate rejects) when the
+    // resolver probes without browser conditions. Pin it to the neutral ESM
+    // build (global crypto + pure-JS hashes) — browser-safe and tree-shakeable.
+    alias: { uuid: UUID_NEUTRAL },
     noExternal: (id: string) => (CLIENT_EXTERNALS.includes(id) ? undefined : true),
     plugins: [purityGatePlugin(), makeCssPlugin('dsh-better-sidebar')],
     outputOptions: {
@@ -287,7 +295,7 @@ function makeCssPlugin(pluginId: string): BuildPlugin {
 }
 
 /** The lazy chunk names (keep in sync with src/bundle-route.ts CHUNK_NAMES). */
-const CHUNKS = ['terminal', 'editor']
+const CHUNKS = ['terminal', 'editor', 'mermaid']
 
 export default [
   {

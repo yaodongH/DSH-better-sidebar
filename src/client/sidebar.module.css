@@ -1082,6 +1082,32 @@
   font: var(--dsw-font-xs-13);
 }
 
+/* Rendered mermaid diagrams: the markdown preview swaps each ```mermaid
+   code block for a `mermaid-diagram` host (a custom tag React never
+   type-matches) whose innerHTML is the sanitized SVG, or keeps the source
+   block inside it plus an error note when rendering fails. */
+.mdMermaid {
+  display: block;
+  margin: 12px 0;
+  overflow-x: auto;
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.mdMermaid svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
+
+.mdMermaidError {
+  margin-top: 8px;
+  font: var(--dsw-font-xxxs-11);
+  color: var(--dsw-alias-state-error-primary);
+}
+
 /* The floating "add to conversation" button anchored above a text
    selection in the preview/code viewers. Portalled to document.body and
    position:fixed, so the editor's overflow clips cannot crop it; flat

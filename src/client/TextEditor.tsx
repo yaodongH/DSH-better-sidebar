@@ -9,7 +9,7 @@
  * The toolbar (mode toggle / dirty dot / save / status) renders as its own
  * row below the host's title bar, VSCode-style.
  */
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import clsx from 'clsx'
 import { EditorState } from '@codemirror/state'
@@ -23,6 +23,8 @@ import { isDarkScheme, subscribeColorScheme } from './theme.ts'
 import { SandboxStatusBar } from './SandboxStatusBar.tsx'
 import { appendToDraft } from './conversation-draft.ts'
 import { buildSelectionInsert, linesOfSelection } from './selection-payload.ts'
+import { loadChunk } from './chunk-loader.ts'
+import { extractMermaidFences, renderMermaidBlocks, type MermaidRenderer } from './mermaid.ts'
 import { t } from './locales.ts'
 import type { FileViewerProps } from './service.ts'
 import css from './sidebar.module.css'
@@ -278,6 +280,43 @@ export function TextEditor(props: FileViewerProps) {
   const [localUnlock, setLocalUnlock] = useState(() => props.store?.getPrefs().htmlViewerDefaultUnsafe === true)
   const htmlNoSandbox = props.store?.getPrefs().htmlViewerNoSandbox === true || localUnlock
 
+  const mdText = draft ?? content ?? ''
+  // Value-memoized (not referentially stable): the inline object used to be
+  // deliberate so a locale switch re-renders the fence labels live — keying
+  // on the resolved label VALUES keeps that, while a stable identity between
+  // locale switches stops the memoized MarkdownText from re-rendering on
+  // every popup state change (and re-parsing the whole preview).
+  const codeLabels = useMemo(() => ({
+    copyLabel: t('copy'),
+    copiedLabel: t('copied'),
+  }), [t('copy'), t('copied')])
+
+  // Mermaid fences: once the preview mounts, swap each ```mermaid code block
+  // for its rendered diagram (the heavy mermaid library rides its own lazy
+  // chunk, fetched only when a fence exists). The preview container below is
+  // keyed by (scheme, text), so any text or theme change remounts it and this
+  // effect re-runs against pristine React-rendered DOM — the injected diagram
+  // wrappers are never reconciled by React (see mermaid.ts). A chunk-load
+  // failure keeps the source blocks and appends the error note.
+  useEffect(() => {
+    if (!markdown || mode !== 'preview') return
+    const host = mdRef.current
+    if (host === null) return
+    const sources = extractMermaidFences(mdText)
+    if (sources.length === 0) return
+    let disposed = false
+    const apply = (renderer: MermaidRenderer | undefined): void => {
+      renderMermaidBlocks(host, sources, renderer, dark, t('mermaidError'), () => !disposed)
+    }
+    void loadChunk('mermaid').then((mod) => {
+      if (disposed) return
+      apply(typeof mod.renderMermaid === 'function' ? mod.renderMermaid as MermaidRenderer : undefined)
+    }).catch(() => {
+      if (!disposed) apply(undefined)
+    })
+    return () => { disposed = true }
+  }, [mdText, dark, mode, markdown])
+
   return (
     <>
       <div className={css.editorHeader}>
@@ -325,6 +364,11 @@ export function TextEditor(props: FileViewerProps) {
       {markdown && mode === 'preview' && (
         <div
           className={css.editorMd}
+          // The key remounts the whole preview subtree on a text or scheme
+          // change, so the mermaid effect above always post-processes fresh
+          // React-rendered DOM (its injected wrappers are then never inside
+          // a reconciliation pass).
+          key={`${String(dark)}:${mdText}`}
           ref={mdRef}
           onMouseUp={handlePreviewMouseUp}
           onScroll={hidePopup}
@@ -332,11 +376,12 @@ export function TextEditor(props: FileViewerProps) {
           {/* The fence copy-button labels must come from this plugin's own
               dictionary: the DSH MarkdownText/CodeBlock are cordis-free and
               fall back to hardcoded Chinese otherwise (same pattern as the
-              chat's AssistantMarkdown). Render-time t() keeps them following
-              the active locale on live switches. */}
+              chat's AssistantMarkdown). Value-memoized so they keep following
+              the active locale on live switches without re-parsing the whole
+              preview on unrelated re-renders. */}
           <MarkdownText
-            text={draft ?? content ?? ''}
-            codeLabels={{ copyLabel: t('copy'), copiedLabel: t('copied') }}
+            text={mdText}
+            codeLabels={codeLabels}
           />
         </div>
       )}

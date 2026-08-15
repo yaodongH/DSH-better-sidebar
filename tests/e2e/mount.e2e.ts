@@ -39,6 +39,10 @@ const WORKSPACE_PATH = process.env.DSH_E2E_WORKSPACE ?? join(tmpdir(), 'dsh-e2e-
  *  lazily-packed editor chunk (client-editor.js) to load. */
 const SEEDED_FILE = 'hello.txt'
 
+/** A markdown file with a ```mermaid fence, opened to force the mermaid chunk
+ *  (client-mermaid.js) and to assert the diagram actually renders. */
+const SEEDED_MERMAID = 'diagram.md'
+
 /**
  * The plugin's crash markers. The client mounts inside an error boundary that
  * renders a strip whose text starts with these prefixes instead of crashing
@@ -56,6 +60,7 @@ let api: APIRequestContext
 async function seedSession(): Promise<void> {
   mkdirSync(WORKSPACE_PATH, { recursive: true })
   writeFileSync(join(WORKSPACE_PATH, SEEDED_FILE), 'hello from the mount lane\n')
+  writeFileSync(join(WORKSPACE_PATH, SEEDED_MERMAID), '```mermaid\ngraph TD\n  A[Start] --> B[End]\n```\n')
   const workspace = await api.post(`${BASE_URL}/api/workspace.create`, {
     data: { type: 'client-request', rpcId: 'e2e-workspace', method: 'workspace.create', payload: { path: WORKSPACE_PATH } },
   })
@@ -185,6 +190,22 @@ test('plugin mounts into the DSH shell and survives a built-in tab sweep', async
   await expect(fileRow, `the seeded "${SEEDED_FILE}" file must appear in the Explorer tree`).toHaveCount(1, { timeout: 30_000 })
   await fileRow.click()
   await editorChunk
+  await page.waitForTimeout(1_500)
+  await assertNoCrash()
+
+  // The markdown preview additionally renders ```mermaid fences through the
+  // lazily-fetched mermaid chunk (client-mermaid.js): open the seeded diagram
+  // file and require the rendered SVG to appear in place of the code block.
+  await sidebar.locator('[class*="tabList"] [title="Explorer"]').click()
+  const mermaidChunk = page.waitForResponse(
+    (response) => response.url().includes('/sidebar/bundle/mermaid.js'),
+    { timeout: 30_000 },
+  )
+  const diagramRow = sidebar.locator(`[role="button"][title$="${SEEDED_MERMAID}"]`)
+  await expect(diagramRow, `the seeded "${SEEDED_MERMAID}" file must appear in the Explorer tree`).toHaveCount(1, { timeout: 30_000 })
+  await diagramRow.click()
+  await mermaidChunk
+  await expect(sidebar.locator('mermaid-diagram svg'), 'the mermaid fence must render as an SVG diagram').toBeAttached({ timeout: 30_000 })
   await page.waitForTimeout(1_500)
   await assertNoCrash()
 

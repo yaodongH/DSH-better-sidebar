@@ -48,6 +48,12 @@ if (g.navigator === undefined) {
   g.navigator = { userAgent: 'node', platform: 'node', vendor: '', maxTouchPoints: 0 }
 }
 
+// The artifact gate runs each chunk as a classic script with `window = globalThis`
+// (the spec reassigns window after this module runs), so mermaid's factory-time
+// listener registration must land somewhere callable in the node environment.
+if (g.addEventListener === undefined) g.addEventListener = () => {}
+if (g.removeEventListener === undefined) g.removeEventListener = () => {}
+
 if (g.window === undefined) {
   g.window = {
     clearTimeout: () => {},
@@ -55,6 +61,10 @@ if (g.window === undefined) {
     innerWidth: 1024,
     innerHeight: 768,
     getComputedStyle: () => ({ getPropertyValue: () => '' }),
+    // mermaid's module init registers a resize/scroll listener at factory
+    // execution (the artifact gate materializes every chunk in node env).
+    addEventListener: () => {},
+    removeEventListener: () => {},
   }
 }
 

@@ -34,6 +34,7 @@ interface PluginManifest {
 interface PackageJson {
   name: string
   version: string
+  files?: string[]
 }
 
 const manifest = JSON.parse(readFileSync(resolve(ROOT, 'dsh.plugin.json'), 'utf8')) as PluginManifest
@@ -65,7 +66,7 @@ function bundleId(file: string): string {
 }
 
 /** The lazy chunk bundle names (mirror of src/bundle-route.ts CHUNK_NAMES). */
-const CHUNK_FILES = ['terminal', 'editor'].map(name => `lib/client-${name}.js`)
+const CHUNK_FILES = ['terminal', 'editor', 'mermaid'].map(name => `lib/client-${name}.js`)
 
 /** The global registry slot a built chunk script assigns (its factory key). */
 function chunkSlot(file: string): string {
@@ -101,6 +102,9 @@ describe('registry manifest consistency (dsh.plugin.json)', () => {
     for (const file of CHUNK_FILES) {
       expect(existsSync(resolve(ROOT, file)), file).toBe(true)
       expect(chunkSlot(file), file).toBe(file.slice('lib/client-'.length, -'.js'.length))
+      // A chunk the npm `files` allowlist omits ships neither in the tarball
+      // nor through the official `dsh plugin add` channel — catch it here.
+      expect(pkg.files, `${file} must ship in the npm tarball (package.json files)`).toContain(file)
     }
   })
 
