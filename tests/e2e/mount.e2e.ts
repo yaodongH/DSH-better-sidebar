@@ -40,8 +40,17 @@ const WORKSPACE_PATH = process.env.DSH_E2E_WORKSPACE ?? join(tmpdir(), 'dsh-e2e-
 const SEEDED_FILE = 'hello.txt'
 
 /** A markdown file with a ```mermaid fence, opened to force the mermaid chunk
- *  (client-mermaid.js) and to assert the diagram actually renders. */
+ *  (client-mermaid.js) and to assert the diagram actually renders. The long
+ *  chain makes the natural size exceed the preview caps, so the lane also
+ *  exercises the shrink-to-cap path and the click-to-zoom lightbox. */
 const SEEDED_MERMAID = 'diagram.md'
+
+/** The mermaid source seeded into {@link SEEDED_MERMAID} (a 26-node chain). */
+const SEEDED_MERMAID_SOURCE = '```mermaid\ngraph TD\n'
+  + '  A --> B --> C --> D --> E --> F --> G --> H --> I --> J\n'
+  + '  J --> K --> L --> M --> N --> O --> P --> Q --> R --> S\n'
+  + '  S --> T --> U --> V --> W --> X --> Y --> Z\n'
+  + '```\n'
 
 /**
  * The plugin's crash markers. The client mounts inside an error boundary that
@@ -60,7 +69,7 @@ let api: APIRequestContext
 async function seedSession(): Promise<void> {
   mkdirSync(WORKSPACE_PATH, { recursive: true })
   writeFileSync(join(WORKSPACE_PATH, SEEDED_FILE), 'hello from the mount lane\n')
-  writeFileSync(join(WORKSPACE_PATH, SEEDED_MERMAID), '```mermaid\ngraph TD\n  A[Start] --> B[End]\n```\n')
+  writeFileSync(join(WORKSPACE_PATH, SEEDED_MERMAID), SEEDED_MERMAID_SOURCE)
   const workspace = await api.post(`${BASE_URL}/api/workspace.create`, {
     data: { type: 'client-request', rpcId: 'e2e-workspace', method: 'workspace.create', payload: { path: WORKSPACE_PATH } },
   })
@@ -206,6 +215,17 @@ test('plugin mounts into the DSH shell and survives a built-in tab sweep', async
   await diagramRow.click()
   await mermaidChunk
   await expect(sidebar.locator('mermaid-diagram svg'), 'the mermaid fence must render as an SVG diagram').toBeAttached({ timeout: 30_000 })
+
+  // Click-to-zoom: the (capped) preview diagram opens a lightbox — ported to
+  // document.body, hence scoped to the page, not the sidebar — showing the
+  // original-size svg; the × button closes it again.
+  await sidebar.locator('mermaid-diagram').click()
+  const lightbox = page.locator('[data-mermaid-lightbox]')
+  await expect(lightbox, 'the click-to-zoom lightbox must open').toBeAttached({ timeout: 10_000 })
+  await expect(lightbox.locator('svg'), 'the lightbox must show the original diagram').toBeAttached()
+  await lightbox.getByRole('button', { name: 'Close' }).click()
+  await expect(lightbox, 'the lightbox must close').toHaveCount(0)
+
   await page.waitForTimeout(1_500)
   await assertNoCrash()
 

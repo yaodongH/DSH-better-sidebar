@@ -9,6 +9,14 @@
  * rendered blocks (in document order) and swaps each for the diagram SVG, or
  * keeps the block and appends an error note when rendering fails.
  *
+ * Preview size cap: a diagram whose viewBox exceeds
+ * {@link MERMAID_PREVIEW_MAX_WIDTH} × {@link MERMAID_PREVIEW_MAX_HEIGHT} is
+ * scaled down uniformly (inline width + `height: auto` + `max-width: 100%`,
+ * so narrow panes still shrink it further without distortion). Every diagram
+ * is click-to-zoom: the wrapper carries role/tabindex/keyboard handling and
+ * calls `open` with the original (uncapped) markup and natural size for the
+ * lightbox.
+ *
  * The swap runs once per preview mount: TextEditor keys its preview container
  * by (scheme, text), so a text or theme change remounts the subtree and this
  * pipeline re-runs on pristine React-rendered DOM. Injected wrappers are
@@ -34,8 +42,33 @@ const DIAGRAM_TAG = 'mermaid-diagram'
 const mdMermaidClass = css.mdMermaid ?? ''
 const mdMermaidErrorClass = css.mdMermaidError ?? ''
 
+/** Preview size caps: diagrams beyond this box scale down; click opens the original. */
+export const MERMAID_PREVIEW_MAX_WIDTH = 720
+export const MERMAID_PREVIEW_MAX_HEIGHT = 480
+
 /** The mermaid chunk's render function (src/client/chunks/mermaid.tsx). */
 export type MermaidRenderer = (source: string, dark: boolean) => Promise<string>
+
+/** One rendered diagram's data, handed to the lightbox on click. */
+export interface MermaidDiagramData {
+  svg: string
+  width: number
+  height: number
+}
+
+/** Click-to-zoom callback (the caller composes the title from its own context). */
+export type MermaidOpenHandler = (diagram: MermaidDiagramData) => void
+
+/** Everything the block swap needs besides the host and the fence bodies. */
+export interface MermaidRenderOptions {
+  renderer: MermaidRenderer | undefined
+  dark: boolean
+  errorLabel: string
+  /** Hover/aria hint on clickable diagrams (localized). */
+  zoomHint: string
+  isActive: () => boolean
+  open?: MermaidOpenHandler | undefined
+}
 
 /**
  * The bodies of every ```mermaid fence in a markdown source, in document
@@ -67,24 +100,47 @@ function infostringOf(block: HTMLElement): string {
 }
 
 /**
+ * The natural size of a rendered diagram from its viewBox attribute
+ * (`"min-x min-y width height"`, numbers may be space/comma separated).
+ * Mermaid always emits one; undefined means the cap and the click-to-zoom
+ * sizing are skipped.
+ */
+export function parseViewBox(viewBox: string | null): { width: number; height: number } | undefined {
+  if (viewBox === null) return undefined
+  const parts = viewBox.trim().split(/[\s,]+/).map(Number)
+  if (parts.length !== 4 || parts.some(Number.isNaN)) return undefined
+  const [, , width, height] = parts
+  if (width === undefined || height === undefined || width <= 0 || height <= 0) return undefined
+  return { width, height }
+}
+
+/** Scale a rendered diagram down to the preview caps (uniform, ratio-safe). */
+function applyPreviewCap(svg: SVGSVGElement, size: { width: number; height: number }): void {
+  if (size.width <= MERMAID_PREVIEW_MAX_WIDTH && size.height <= MERMAID_PREVIEW_MAX_HEIGHT) return
+  const scale = Math.min(MERMAID_PREVIEW_MAX_WIDTH / size.width, MERMAID_PREVIEW_MAX_HEIGHT / size.height)
+  const style = svg.style
+  style.width = `${Math.round(size.width * scale)}px`
+  // height auto + the viewBox ratio keep the shrink uniform; max-width lets a
+  // pane narrower than the cap shrink it further without distortion.
+  style.height = 'auto'
+  style.maxWidth = '100%'
+}
+
+/**
  * Swap every ```mermaid fence code block under `host` for its rendered
  * diagram. `renderer` of undefined means the lazy mermaid chunk failed to
  * load — each block then keeps its source and gains the error note instead.
  * @param host - The preview container (TextEditor's `mdRef` current node).
  * @param sources - The fence bodies from {@link extractMermaidFences}, in order.
- * @param renderer - The chunk's render function, or undefined on chunk failure.
- * @param dark - The app's resolved color scheme (picked per diagram).
- * @param errorLabel - Localized note appended when a diagram cannot render.
- * @param isActive - Whether this mount is still live (false after unmount/remount).
+ * @param options - Renderer, scheme, labels, liveness probe, and the optional
+ *   click-to-zoom callback.
  */
 export function renderMermaidBlocks(
   host: HTMLElement,
   sources: readonly string[],
-  renderer: MermaidRenderer | undefined,
-  dark: boolean,
-  errorLabel: string,
-  isActive: () => boolean,
+  options: MermaidRenderOptions,
 ): void {
+  const { renderer, dark, errorLabel, zoomHint, isActive, open } = options
   const blocks = Array.from(host.querySelectorAll<HTMLElement>(CODE_BLOCK_SELECTOR))
     .filter(block => infostringOf(block) === 'mermaid')
   for (const [index, block] of blocks.entries()) {
@@ -102,6 +158,23 @@ export function renderMermaidBlocks(
       // Mermaid output is sanitized by the library (securityLevel 'strict');
       // the SVG is static markup, so innerHTML on a fresh element is safe.
       diagram.innerHTML = svg
+      const svgEl = diagram.querySelector('svg')
+      const size = svgEl === null ? undefined : parseViewBox(svgEl.getAttribute('viewBox'))
+      if (svgEl !== null && size !== undefined) applyPreviewCap(svgEl as SVGSVGElement, size)
+      if (size !== undefined && open !== undefined) {
+        diagram.setAttribute('role', 'button')
+        diagram.setAttribute('tabindex', '0')
+        diagram.setAttribute('aria-label', zoomHint)
+        diagram.setAttribute('title', zoomHint)
+        const openOriginal = (): void => { open({ svg, width: size.width, height: size.height }) }
+        diagram.addEventListener('click', openOriginal)
+        diagram.addEventListener('keydown', (event) => {
+          if (event.key === 'Enter' || event.key === ' ') {
+            event.preventDefault()
+            openOriginal()
+          }
+        })
+      }
       block.replaceWith(diagram)
     }).catch(() => {
       if (!isActive() || !block.isConnected) return

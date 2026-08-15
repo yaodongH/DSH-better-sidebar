@@ -24,7 +24,8 @@ import { SandboxStatusBar } from './SandboxStatusBar.tsx'
 import { appendToDraft } from './conversation-draft.ts'
 import { buildSelectionInsert, linesOfSelection } from './selection-payload.ts'
 import { loadChunk } from './chunk-loader.ts'
-import { extractMermaidFences, renderMermaidBlocks, type MermaidRenderer } from './mermaid.ts'
+import { extractMermaidFences, renderMermaidBlocks, type MermaidDiagramData, type MermaidRenderer } from './mermaid.ts'
+import { MermaidLightbox } from './MermaidLightbox.tsx'
 import { t } from './locales.ts'
 import type { FileViewerProps } from './service.ts'
 import css from './sidebar.module.css'
@@ -291,6 +292,9 @@ export function TextEditor(props: FileViewerProps) {
     copiedLabel: t('copied'),
   }), [t('copy'), t('copied')])
 
+  /** The click-to-zoom lightbox data (null = closed); the overlay portals to document.body. */
+  const [lightbox, setLightbox] = useState<MermaidDiagramData | null>(null)
+
   // Mermaid fences: once the preview mounts, swap each ```mermaid code block
   // for its rendered diagram (the heavy mermaid library rides its own lazy
   // chunk, fetched only when a fence exists). The preview container below is
@@ -306,7 +310,14 @@ export function TextEditor(props: FileViewerProps) {
     if (sources.length === 0) return
     let disposed = false
     const apply = (renderer: MermaidRenderer | undefined): void => {
-      renderMermaidBlocks(host, sources, renderer, dark, t('mermaidError'), () => !disposed)
+      renderMermaidBlocks(host, sources, {
+        renderer,
+        dark,
+        errorLabel: t('mermaidError'),
+        zoomHint: t('mermaidZoomHint'),
+        isActive: () => !disposed,
+        open: (diagram) => { setLightbox(diagram) },
+      })
     }
     void loadChunk('mermaid').then((mod) => {
       if (disposed) return
@@ -420,6 +431,16 @@ export function TextEditor(props: FileViewerProps) {
         >
           {t('addToConversation')}
         </button>,
+        document.body,
+      )}
+      {lightbox !== null && createPortal(
+        <MermaidLightbox
+          svg={lightbox.svg}
+          width={lightbox.width}
+          height={lightbox.height}
+          title={path}
+          onClose={() => { setLightbox(null) }}
+        />,
         document.body,
       )}
     </>

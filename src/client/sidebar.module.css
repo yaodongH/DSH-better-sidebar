@@ -1085,7 +1085,9 @@
 /* Rendered mermaid diagrams: the markdown preview swaps each ```mermaid
    code block for a `mermaid-diagram` host (a custom tag React never
    type-matches) whose innerHTML is the sanitized SVG, or keeps the source
-   block inside it plus an error note when rendering fails. */
+   block inside it plus an error note when rendering fails. Diagrams beyond
+   the preview caps are scaled down (see mermaid.ts), and every diagram is
+   click-to-zoom (role=button + tabindex set at injection). */
 .mdMermaid {
   display: block;
   margin: 12px 0;
@@ -1096,16 +1098,106 @@
   background: var(--dsw-alias-bg-layer-2);
 }
 
+.mdMermaid[role='button'] {
+  cursor: zoom-in;
+}
+
+.mdMermaid[role='button']:hover {
+  border-color: var(--dsw-alias-border-l1);
+}
+
 .mdMermaid svg {
   display: block;
   max-width: 100%;
   height: auto;
+  margin: 0 auto;
 }
 
 .mdMermaidError {
   margin-top: 8px;
   font: var(--dsw-font-xxxs-11);
   color: var(--dsw-alias-state-error-primary);
+}
+
+/* The click-to-zoom lightbox (MermaidLightbox): full-screen overlay ported
+   to document.body; the toolbar keeps flat GUI chrome and the stage holds
+   the diagram at its natural size under an imperative translate/scale. */
+.lightboxOverlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  background: rgba(8, 10, 14, 0.68);
+  backdrop-filter: blur(4px);
+}
+
+.lightboxToolbar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+}
+
+.lightboxTitle {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font: var(--dsw-font-xxs-12);
+  color: var(--dsw-alias-label-secondary);
+}
+
+.lightboxZoomPct {
+  min-width: 44px;
+  text-align: right;
+  font: var(--dsw-font-xxxs-strong-11);
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.lightboxButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--dsw-alias-border-l1);
+  border-radius: 6px;
+  background: var(--dsw-alias-bg-layer-2);
+  color: var(--dsw-alias-label-primary);
+  font: var(--dsw-font-xxs-12);
+  cursor: pointer;
+}
+
+.lightboxButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.lightboxStage {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  touch-action: none;
+  cursor: grab;
+}
+
+.lightboxStage:active {
+  cursor: grabbing;
+}
+
+.lightboxContent {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+  will-change: transform;
+}
+
+.lightboxContent svg {
+  display: block;
 }
 
 /* The floating "add to conversation" button anchored above a text
