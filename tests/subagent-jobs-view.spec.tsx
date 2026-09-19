@@ -12,6 +12,7 @@ import { act } from 'react-dom/test-utils'
 import { renderRoot } from './test-utils.ts'
 import { SubagentView } from '../src/client/SubagentView.tsx'
 import type { Context, SidebarSessionList } from '../src/context-types.ts'
+import { sessionList } from './session-list.ts'
 
 /** A subscribable sessions-list snapshot (mirror of the runtime list feed). */
 function makeStore(initial: SidebarSessionList) {
@@ -60,7 +61,7 @@ function jsonResponse(value: unknown): Response {
 }
 
 function baseSnapshot(): SidebarSessionList {
-  return {
+  return sessionList({
     current: 'root',
     byId: {
       root: { id: 'root', displayTitle: '主会话', running: true },
@@ -75,7 +76,7 @@ function baseSnapshot(): SidebarSessionList {
         { id: 'bash-2', kind: 'bash', label: 'echo hi', status: 'completed', startedAt: 2_000, finishedAt: 3_000 },
       ],
     },
-  }
+  })
 }
 
 beforeEach(() => {
@@ -133,7 +134,12 @@ describe('SubagentView background jobs', () => {
   })
 
   it('renders nothing job-related when the mirror is empty', () => {
-    const store = makeStore({ current: 'root', byId: { root: { id: 'root', displayTitle: '主会话' } }, subagentsByParent: {}, jobsBySession: {} })
+    const store = makeStore(sessionList({
+      current: 'root',
+      byId: { root: { id: 'root', displayTitle: '主会话' } },
+      subagentsByParent: {},
+      jobsBySession: {},
+    }))
     const { container, unmount } = renderRoot(
       createElement(SubagentView, { sessionId: 'root', active: true, ctx: makeCtx(store) }),
     )
@@ -230,12 +236,12 @@ describe('SubagentView background jobs', () => {
       startedAt: 1_000 + index,
       ...(index % 2 === 0 ? {} : { finishedAt: 2_000 + index, detail: 'exit code: 1' }),
     }))
-    const store = makeStore({
+    const store = makeStore(sessionList({
       current: 'root',
       byId: { root: { id: 'root', displayTitle: '主会话' } },
       subagentsByParent: {},
       jobsBySession: { root: many },
-    })
+    }))
     const { container, unmount } = renderRoot(
       createElement(SubagentView, { sessionId: 'root', active: true, ctx: makeCtx(store) }),
     )

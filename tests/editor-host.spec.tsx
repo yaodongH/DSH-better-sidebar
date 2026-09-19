@@ -17,6 +17,7 @@ import type { Context } from '../src/context-types.ts'
 import { EditorHost } from '../src/client/EditorHost.tsx'
 import { createBetterSidebarService, type FileViewerProps } from '../src/client/service.ts'
 import { allLeaves, createSidebarStore, type SidebarTab } from '../src/client/state.ts'
+import { sessionList } from './session-list.ts'
 
 // The act() environment flag (React 18.2 reads it before flushing effects).
 import { setupReactAct } from './test-utils.ts'
@@ -43,7 +44,10 @@ function setup(): {
     allLeaves(store.getSnapshot().state!.bottomSplits).flatMap(leaf => leaf.tabs)
       .find(tab => tab.type === 'editor' && tab.path === undefined)!
   // openSidebarFile reads the session cwd from ctx.sessions.
-  const sessionsSnapshot = { byId: { 'editor-home-session': { cwd: '/tmp' } }, current: 'editor-home-session' }
+  const sessionsSnapshot = sessionList({
+    current: 'editor-home-session',
+    byId: { 'editor-home-session': { id: 'editor-home-session', displayTitle: 'Editor home', cwd: '/tmp' } },
+  })
   const ctx = {
     betterSidebar: service,
     get: (name: string) => name === 'betterSidebar' ? service : undefined,

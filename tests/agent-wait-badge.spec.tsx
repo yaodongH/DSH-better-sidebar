@@ -17,6 +17,7 @@ setupReactAct()
 import { Sidebar } from '../src/client/Sidebar.tsx'
 import { createSidebarStore, openTabInBottomPane } from '../src/client/state.ts'
 import { createBetterSidebarService, type BetterSidebarService } from '../src/client/service.ts'
+import { sessionList } from './session-list.ts'
 
 /** jsdom has no WebSocket; the agent-terminals push effect constructs one on mount. */
 class FakeWebSocket {
@@ -59,10 +60,10 @@ function mountSidebar(): { container: HTMLDivElement; store: ReturnType<typeof c
   const sessionId = `s1-${++sessionSeq}`
   store.setSession(sessionId)
   const localeSnapshot = { active: 'en' }
-  const sessionsSnapshot = {
+  const sessionsSnapshot = sessionList({
     current: sessionId,
-    byId: { [sessionId]: { cwd: '/tmp' } },
-  }
+    byId: { [sessionId]: { id: sessionId, displayTitle: 'Root', cwd: '/tmp' } },
+  })
   const ctx = {
     locale: { subscribe: () => () => {}, getSnapshot: () => localeSnapshot },
     sessions: { list: { subscribe: () => () => {}, getSnapshot: () => sessionsSnapshot } },

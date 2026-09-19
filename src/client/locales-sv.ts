@@ -348,6 +348,7 @@ export const sv: Record<string, string> = {
   sideChatBlockExpandAria: 'Visa {hidden} rader till',
   sideChatBlockSignal: 'Avslutad av signal: {signal}',
   sideChatBlockExitCode: 'Slutkod {code}',
+  sideChatBlockNoExitCode: 'ingen slutkod',
   sideChatBlockRunning: 'Körs',
   sideChatBlockFailed: 'Misslyckades',
   sideChatBlockDone: 'Klar',

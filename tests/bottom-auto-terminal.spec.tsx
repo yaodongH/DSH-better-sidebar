@@ -27,6 +27,7 @@ import { Sidebar } from '../src/client/Sidebar.tsx'
 import { allLeaves, createSidebarStore, toggleBottomPanel, type SidebarStore } from '../src/client/state.ts'
 import { createBetterSidebarService, type BetterSidebarService } from '../src/client/service.ts'
 import { t } from '../src/client/locales.ts'
+import { sessionList } from './session-list.ts'
 
 /** jsdom has no WebSocket; the agent-terminals push effect constructs one on mount. */
 class FakeWebSocket {
@@ -64,11 +65,11 @@ function mountSidebar(): MountedSidebar {
   // useSyncExternalStore requires STABLE snapshots across calls (the real DSH
   // services return stable objects) — a fresh object per call loops forever.
   const localeSnapshot = { active: 'en' }
-  const sessionsSnapshot = {
+  const sessionsSnapshot = sessionList({
     current: sessionId,
     // cwd present → api.sessionCwd is never called in these tests.
-    byId: { [sessionId]: { cwd: '/tmp' } },
-  }
+    byId: { [sessionId]: { id: sessionId, displayTitle: 'Root', cwd: '/tmp' } },
+  })
   const ctx = {
     locale: { subscribe: () => () => {}, getSnapshot: () => localeSnapshot },
     sessions: { list: { subscribe: () => () => {}, getSnapshot: () => sessionsSnapshot } },

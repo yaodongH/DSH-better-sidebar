@@ -23,6 +23,7 @@ import { setupReactAct } from './test-utils.ts'
 setupReactAct()
 
 import { Sidebar } from '../src/client/Sidebar.tsx'
+import { currentSessionId } from '../src/client/session-current.ts'
 import { allLeaves, createSidebarStore, type SidebarStore } from '../src/client/state.ts'
 import {
   createBetterSidebarService,
@@ -31,6 +32,7 @@ import {
   type TabComponentProps,
 } from '../src/client/service.ts'
 import type { Context, SidebarSessionList } from '../src/context-types.ts'
+import { sessionList } from './session-list.ts'
 
 class FakeWebSocket {
   onmessage: ((event: { data: unknown }) => void) | null = null
@@ -149,13 +151,13 @@ function mountSidebar(
   setViewport(width)
   vi.stubGlobal('WebSocket', FakeWebSocket)
   const sessionId = `auto-activation-${++sessionSeq}`
-  const initial: SidebarSessionList = {
+  const initial = sessionList({
     current: sessionId,
     byId: {
       [sessionId]: { id: sessionId, cwd: '/tmp', displayTitle: 'Root' },
     },
     jobsBySession: { [sessionId]: [] },
-  }
+  })
   const feed = makeSessionFeed(initial)
   const store = createSidebarStore()
   store.setPrefs({ ...store.getPrefs(), autoOpenSubagent: true, autoOpenJobs: true })
@@ -209,7 +211,7 @@ function publishActivity(sidebar: MountedSidebar, source: ActivitySource): void 
 
 function publishSubagent(sidebar: MountedSidebar): void {
   const before = sidebar.feed.getSnapshot()
-  const sessionId = before.current!
+  const sessionId = currentSessionId(before)!
   act(() => {
     sidebar.feed.set({
       ...before,
@@ -233,7 +235,7 @@ function flushSubagentDebounce(): void {
 
 function publishJob(sidebar: MountedSidebar): void {
   const before = sidebar.feed.getSnapshot()
-  const sessionId = before.current!
+  const sessionId = currentSessionId(before)!
   act(() => {
     sidebar.feed.set({
       ...before,
@@ -254,13 +256,16 @@ function publishJob(sidebar: MountedSidebar): void {
 /** Switch the conversation to the child session the Tasks page jumped to. */
 function switchToChild(sidebar: MountedSidebar): void {
   const before = sidebar.feed.getSnapshot()
-  const parent = before.current!
+  const parent = currentSessionId(before)!
   act(() => {
-    sidebar.feed.set({
+    sidebar.feed.set(sessionList({
       ...before,
       current: 'child',
       byId: {
         ...before.byId,
+        // The switch MOVES the main-view retain: the previous row must give it
+        // up, or `currentSessionId` would still name the parent conversation.
+        [parent]: { ...before.byId[parent]!, retainedBy: { mainView: 0 } },
         child: {
           id: 'child',
           displayTitle: 'Worker',
@@ -269,7 +274,7 @@ function switchToChild(sidebar: MountedSidebar): void {
           running: true,
         },
       },
-    })
+    }))
   })
 }
 

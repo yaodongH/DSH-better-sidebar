@@ -14,6 +14,7 @@ import {
   treeSessionIds,
 } from '../src/client/subagent-jobs.ts'
 import type { SidebarSessionList, SidebarSessionSummary, SidebarJobStatus, SidebarJobView } from '../src/context-types.ts'
+import { sessionList } from './session-list.ts'
 
 /** The translator stub: renders duration templates like the real locale copy. */
 const templates: Record<string, string> = {
@@ -134,7 +135,7 @@ describe('status presentation helpers', () => {
 })
 
 describe('detectNewJob', () => {
-  const list = (jobsBySession: Record<string, SidebarJobView[]>): SidebarSessionList => ({
+  const list = (jobsBySession: Record<string, SidebarJobView[]>): SidebarSessionList => sessionList({
     current: 'root',
     byId: { root: { id: 'root', displayTitle: 'root' } },
     subagentsByParent: {},

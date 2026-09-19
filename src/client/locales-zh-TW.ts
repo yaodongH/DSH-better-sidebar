@@ -380,6 +380,7 @@ export const zhTW: Record<string, string> = {
   sideChatBlockExpandAria: '展開其餘 {hidden} 行',
   sideChatBlockSignal: '訊號終止：{signal}',
   sideChatBlockExitCode: '結束碼 {code}',
+  sideChatBlockNoExitCode: '未正常退出',
   sideChatBlockRunning: '執行中',
   sideChatBlockFailed: '失敗',
   sideChatBlockDone: '完成',

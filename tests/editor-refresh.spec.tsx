@@ -14,6 +14,7 @@ import type { Context } from '../src/context-types.ts'
 import { EditorHost } from '../src/client/EditorHost.tsx'
 import { createBetterSidebarService, type FileViewerProps } from '../src/client/service.ts'
 import { allLeaves, createSidebarStore, type SidebarTab } from '../src/client/state.ts'
+import { sessionList } from './session-list.ts'
 
 // The act() environment flag (React 18.2 reads it before flushing effects).
 setupReactAct()
@@ -76,7 +77,10 @@ function setup(initialMode: 'preview' | 'edit' = 'preview', dirty = false): {
     }),
   })
   store.setSession('editor-home-session')
-  const sessionsSnapshot = { byId: { 'editor-home-session': { cwd: '/tmp' } }, current: 'editor-home-session' }
+  const sessionsSnapshot = sessionList({
+    current: 'editor-home-session',
+    byId: { 'editor-home-session': { id: 'editor-home-session', displayTitle: 'Editor home', cwd: '/tmp' } },
+  })
   const ctx = {
     betterSidebar: service,
     sessions: { list: { subscribe: () => () => {}, getSnapshot: () => sessionsSnapshot } },

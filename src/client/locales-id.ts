@@ -363,6 +363,7 @@ export const id: Record<string, string> = {
   sideChatBlockExpandAria: 'Perlihatkan {hidden} baris lagi',
   sideChatBlockSignal: 'Diakhiri sinyal: {signal}',
   sideChatBlockExitCode: 'Kode keluar {code}',
+  sideChatBlockNoExitCode: 'tanpa kode keluar',
   sideChatBlockRunning: 'Berjalan',
   sideChatBlockFailed: 'Gagal',
   sideChatBlockDone: 'Selesai',

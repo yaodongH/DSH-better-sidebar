@@ -14,6 +14,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { createSidebarStore } from '../src/client/state.ts'
 import { registerTurnTailInterception } from '../src/client/intercept.tsx'
 import type { Context } from '../src/context-types.ts'
+import { sessionList } from './session-list.ts'
 
 interface RegisteredSlot {
   options: Record<string, unknown>
@@ -80,7 +81,12 @@ const clientCtx = (slots: unknown): Context => {
   return {
     slots,
     sessions: {
-      list: { getSnapshot: () => ({ current: 's1', byId: { s1: { id: 's1', cwd: '/w', displayTitle: 's1' } } }) },
+      list: {
+        getSnapshot: () => sessionList({
+          current: 's1',
+          byId: { s1: { id: 's1', cwd: '/w', displayTitle: 's1' } },
+        }),
+      },
     },
     betterSidebar,
     get: (name: string) => name === 'betterSidebar' ? betterSidebar : undefined,
@@ -97,9 +103,14 @@ describe('turn-tail interception registration (issue #15)', () => {
     expect(fake.registered).toHaveLength(1)
     const { options, component } = fake.registered[0]!
     expect(options.name).toBe('conversation.chat.turnTail')
+    // DSH 0.1.6-alpha.2 made this slot a `list` cell: the entry is addressed by
+    // `id` (a missing id throws at load time). Claiming the host deliverables
+    // cell at a lower priority is what shadows the default row.
+    expect(options.id).toBe('@deepseek-ai/dsh-client-ui-deliverables')
     expect(options.priority).toBe(-1)
     expect(options.registrant).toBe('dsh-better-sidebar')
-    expect(options.select).toBeTypeOf('function')
+    // A list entry has no selector seat — the claim test lives in the component.
+    expect(options.select).toBeUndefined()
     expect(options.inject).toBeTypeOf('function')
     expect(component).toBeTypeOf('function')
 
@@ -142,26 +153,30 @@ describe('turn-tail interception registration (issue #15)', () => {
     expect(fake.registered).toHaveLength(0)
   })
 
-  it('declines the takeover while the editor tab is disabled in the settings', () => {
+  it('claims produced turns in the component and declines on disabled settings', () => {
     const fake = fakeSlots(true)
     const store = createSidebarStore()
     const restore = registerTurnTailInterception(clientCtx(fake.slots), store)
-    const select = fake.registered[0]!.options.select as (owner: unknown) => unknown
+    // The list kind has no `select`: the claim test runs inside the registered
+    // component, which either returns its chip row or null.
+    const Row = fake.registered[0]!.component as
+      (props: unknown) => { props?: { matched?: unknown } } | null
 
-    // Enabled (default): a produced turn claims the chain; an empty one declines.
-    expect(select(producedOwner(['a.ts', 'b.ts']))).toEqual(['a.ts', 'b.ts'])
-    expect(select(emptyOwner())).toBeNull()
+    // Enabled (default): a produced turn claims the cell; an empty one declines.
+    expect(Row(producedOwner(['a.ts', 'b.ts']))?.props?.matched).toEqual(['a.ts', 'b.ts'])
+    expect(Row(emptyOwner())).toBeNull()
     // The engine Turn data path (the real owner currency: { turn, seq,
     // openFile }) claims through the deliverables record too.
-    expect(select({
+    expect(Row({
       turn: { data: { get: (key: string) => key === 'deliverables' ? { produced: [{ seq: 1, path: 'a.ts' }] } : undefined } },
       seq: 1,
-    })).toEqual(['a.ts'])
+    })?.props?.matched).toEqual(['a.ts'])
 
-    // Editor tab disabled: even a produced turn falls back to the default
-    // deliverables row (chips that cannot open must not be offered).
+    // Editor tab disabled: the cell renders nothing rather than chips that
+    // cannot open. The host deliverables entry shares this cell and is
+    // shadowed, so the row goes empty instead of falling back to it.
     store.setPrefs({ ...store.getPrefs(), tabsEnabled: { editor: false } })
-    expect(select(producedOwner(['a.ts']))).toBeNull()
+    expect(Row(producedOwner(['a.ts']))).toBeNull()
 
     restore()
   })

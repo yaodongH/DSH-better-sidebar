@@ -363,6 +363,7 @@ export const nl: Record<string, string> = {
   sideChatBlockExpandAria: '{hidden} regels meer uitvouwen',
   sideChatBlockSignal: 'Beëindigd door signaal: {signal}',
   sideChatBlockExitCode: 'Exitcode {code}',
+  sideChatBlockNoExitCode: 'geen exitcode',
   sideChatBlockRunning: 'Wordt uitgevoerd',
   sideChatBlockFailed: 'Mislukt',
   sideChatBlockDone: 'Voltooid',

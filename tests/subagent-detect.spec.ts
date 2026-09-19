@@ -4,6 +4,7 @@ import {
   directSubagentCount, rootAncestor,
 } from '../src/client/subagent-detect.ts'
 import type { SidebarSessionList, SidebarSubagentCatalog } from '../src/context-types.ts'
+import { sessionList } from './session-list.ts'
 
 describe('subagent detection over the sessions list feed', () => {
   /** A list snapshot carrying the given direct subagent children of `parent`. */
@@ -22,7 +23,7 @@ describe('subagent detection over the sessions list feed', () => {
         running: running.includes(id),
       }
     }
-    return { current: parent, byId }
+    return sessionList({ current: parent, byId })
   }
 
   it('counts only the direct subagent children of the given session', () => {
@@ -87,14 +88,14 @@ describe('subagent detection over the sessions list feed', () => {
     expect(directSubagentCount(byId, 'p1')).toBe(1)
     expect(countSubagentDescendants(byId, 'p1')).toEqual({ count: 1, runningCount: 0 })
     // A side thread appearing under an empty session never trips 0 → N.
-    const before: SidebarSessionList = { current: 'p2', byId: { p2: { id: 'p2', displayTitle: 'P2' } } }
-    const after: SidebarSessionList = {
+    const before = sessionList({ current: 'p2', byId: { p2: { id: 'p2', displayTitle: 'P2' } } })
+    const after = sessionList({
       current: 'p2',
       byId: {
         p2: { id: 'p2', displayTitle: 'P2' },
         s2: { id: 's2', displayTitle: 'Side: New thread', origin: 'subagent', parentId: 'p2' },
       },
-    }
+    })
     expect(detectNewDirectSubagent(before, after, 'p2')).toBe(false)
   })
 
@@ -106,22 +107,22 @@ describe('subagent detection over the sessions list feed', () => {
     // AUTO_OPEN_DEBOUNCE_MS and re-evaluates the ORIGINAL baseline against
     // the live snapshot; once the title frame has landed the same baseline
     // yields no trigger. These two assertions pin exactly that dependency.
-    const baseline: SidebarSessionList = { current: 'p2', byId: { p2: { id: 'p2', displayTitle: 'P2' } } }
-    const firstFrame: SidebarSessionList = {
+    const baseline = sessionList({ current: 'p2', byId: { p2: { id: 'p2', displayTitle: 'P2' } } })
+    const firstFrame = sessionList({
       current: 'p2',
       byId: {
         p2: { id: 'p2', displayTitle: 'P2' },
         s2: { id: 's2', displayTitle: 'DSH-better-sidebar', origin: 'subagent', parentId: 'p2' },
       },
-    }
+    })
     expect(detectNewDirectSubagent(baseline, firstFrame, 'p2')).toBe(true) // the race
-    const settled: SidebarSessionList = {
+    const settled = sessionList({
       current: 'p2',
       byId: {
         p2: { id: 'p2', displayTitle: 'P2' },
         s2: { id: 's2', displayTitle: 'Side: New thread', origin: 'subagent', parentId: 'p2' },
       },
-    }
+    })
     expect(detectNewDirectSubagent(baseline, settled, 'p2')).toBe(false) // after the debounce
   })
 

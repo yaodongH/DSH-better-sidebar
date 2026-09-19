@@ -18,6 +18,7 @@
  */
 import type { Context } from '../../context-types.ts'
 import { fileAddressFor } from '../resource-address.ts'
+import { currentSessionId } from '../session-current.ts'
 import type { NativeTabParams, SidebarSurface } from '../service.ts'
 import type { NativeTabRecords } from './tab-adapter.tsx'
 
@@ -48,7 +49,7 @@ export interface NativeSurface extends SidebarSurface {
 /** The active session id, as the client list reports it. */
 function activeSessionId(ctx: Context): string | undefined {
   try {
-    return ctx.sessions.list.getSnapshot().current
+    return currentSessionId(ctx.sessions.list.getSnapshot())
   } catch {
     return undefined
   }

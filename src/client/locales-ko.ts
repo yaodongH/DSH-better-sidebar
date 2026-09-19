@@ -357,6 +357,7 @@ export const ko: Record<string, string> = {
   sideChatBlockExpandAria: '나머지 {hidden}줄 펼치기',
   sideChatBlockSignal: '시그널로 종료됨: {signal}',
   sideChatBlockExitCode: '종료 코드 {code}',
+  sideChatBlockNoExitCode: '종료 코드 없음',
   sideChatBlockRunning: '실행 중',
   sideChatBlockFailed: '실패',
   sideChatBlockDone: '완료',

@@ -365,6 +365,7 @@ export const tr: Record<string, string> = {
   sideChatBlockExpandAria: '{hidden} satır daha genişlet',
   sideChatBlockSignal: 'Sinyalle sonlandırıldı: {signal}',
   sideChatBlockExitCode: 'Çıkış kodu {code}',
+  sideChatBlockNoExitCode: 'çıkış kodu yok',
   sideChatBlockRunning: 'Çalışıyor',
   sideChatBlockFailed: 'Başarısız',
   sideChatBlockDone: 'Tamamlandı',

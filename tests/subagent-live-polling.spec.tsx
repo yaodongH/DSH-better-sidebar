@@ -11,6 +11,7 @@ import { act } from 'react-dom/test-utils'
 import { renderRoot } from './test-utils.ts'
 import { SubagentView } from '../src/client/SubagentView.tsx'
 import type { Context, SidebarSessionList } from '../src/context-types.ts'
+import { sessionList } from './session-list.ts'
 
 /** A subscribable sessions-list snapshot (mirror of the runtime list feed). */
 function makeStore(initial: SidebarSessionList) {
@@ -57,7 +58,7 @@ function jsonResponse(value: unknown): Response {
 
 /** A topology snapshot with two running direct subagents and a ready catalog. */
 function runningSnapshot(): SidebarSessionList {
-  return {
+  return sessionList({
     current: 'root',
     byId: {
       root: { id: 'root', displayTitle: '主会话' },
@@ -76,12 +77,12 @@ function runningSnapshot(): SidebarSessionList {
       },
     },
     jobsBySession: {},
-  }
+  })
 }
 
 /** The same tree re-rooted under a new ancestor ('grand' becomes the root). */
 function reRootedSnapshot(): SidebarSessionList {
-  return {
+  return sessionList({
     current: 'root',
     byId: {
       grand: { id: 'grand', displayTitle: '主会话' },
@@ -109,7 +110,7 @@ function reRootedSnapshot(): SidebarSessionList {
       },
     },
     jobsBySession: {},
-  }
+  })
 }
 
 beforeEach(() => {

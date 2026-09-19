@@ -36,7 +36,7 @@ import {
   IconNewChatOutline16,
   IconPlusOutline16,
   IconSearchOutline16,
-  IconSendOutline16,
+  IconSendOutline14,
   IconSparkle16,
   IconStopFill16,
   MarkdownText,
@@ -354,6 +354,9 @@ export function SideChatView(props: {
         ...shared,
         signal: (signal: string) => t('sideChatBlockSignal', { signal }),
         exitCode: (exitCode: number) => t('sideChatBlockExitCode', { code: exitCode }),
+        // DSH 0.1.6 added this required label: the status pill for a command
+        // that settled without an exit code (unknown signal, or never started).
+        noExitCode: t('sideChatBlockNoExitCode'),
         running: t('sideChatBlockRunning'),
         failed: t('sideChatBlockFailed'),
         done: t('sideChatBlockDone'),
@@ -736,10 +739,11 @@ export function SideChatView(props: {
         </button>
       </div>
       {connectionState !== undefined && connectionState !== 'connected' && (
+        // DSH 0.1.6 dropped ConnectionIndicator's reconnectLabel prop; the
+        // remaining labels already state the reconnect affordance.
         <ConnectionIndicator
           state={connectionState}
           disconnectedLabel={t('sideChatConnDisconnected')}
-          reconnectLabel={t('sideChatConnReconnect')}
           connectingLabel={t('sideChatConnConnecting')}
           recoveredLabel={t('sideChatConnRecovered')}
           reconnectActionLabel={t('sideChatConnReconnectAction')}
@@ -802,7 +806,10 @@ export function SideChatView(props: {
               disabled={composer.trim() === '' || busy !== null}
               title={t('sideChatSend')}
             >
-              <IconSendOutline16 />
+              {/* DSH 0.1.6 removed IconSendOutline16; IconSendOutline14 is the
+                  same up-arrow glyph on a 14-unit viewBox, so pinning the size
+                  keeps the previous 16px rendering. */}
+              <IconSendOutline14 size={16} />
             </button>
           )}
         </div>

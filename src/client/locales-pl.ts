@@ -367,6 +367,7 @@ export const pl: Record<string, string> = {
   sideChatBlockExpandAria: 'Rozwiń kolejne {hidden} wierszy',
   sideChatBlockSignal: 'Zakończono sygnałem: {signal}',
   sideChatBlockExitCode: 'Kod zakończenia {code}',
+  sideChatBlockNoExitCode: 'brak kodu wyjścia',
   sideChatBlockRunning: 'Uruchomione',
   sideChatBlockFailed: 'Niepowodzenie',
   sideChatBlockDone: 'Zakończono',

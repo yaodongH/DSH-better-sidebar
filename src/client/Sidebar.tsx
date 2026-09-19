@@ -37,6 +37,7 @@ import {
   type DropZone, type SidebarStore, type SidebarTab,
 } from './state.ts'
 import { getPinnedHomeScope } from './pinned.ts'
+import { currentSessionId } from './session-current.ts'
 import { IconPanelBottomOutline16 } from './icons.tsx'
 import { Workbench, type WorkbenchActions } from './split-pane.tsx'
 import { useViewportSize } from './breakpoints.ts'
@@ -197,7 +198,7 @@ export function Sidebar(props: { ctx: Context; store: SidebarStore }) {
     useMemo(() => (callback: () => void) => ctx.sessions.list.subscribe(callback), [ctx]),
     useCallback(() => ctx.sessions.list.getSnapshot(), [ctx]),
   )
-  const current = sessionList.current
+  const current = currentSessionId(sessionList)
 
   // Per-session sidebar state.
   const snapshot = useSyncExternalStore(

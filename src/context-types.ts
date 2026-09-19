@@ -146,6 +146,12 @@ export interface SidebarSessionSummary {
   parentId?: string
   /** Whether the session's agent is currently running. */
   running?: boolean
+  /**
+   * Local ownership counts. DSH 0.1.6-alpha.2 moved selection out of the list
+   * snapshot, so the on-screen conversation is named by the main-view retain
+   * count (`mainView > 0`) — see `session-current.ts`.
+   */
+  retainedBy?: { mainView?: number }
 }
 
 /** One healthy subagent catalog child row (structural mirror of the runtime). */
@@ -328,7 +334,12 @@ export interface SidebarSessionHandle {
 
 /** The client session list snapshot the sidebar subscribes to. */
 export interface SidebarSessionList {
-  current: string | undefined
+  /**
+   * Host-list order. DSH 0.1.6-alpha.2 added it; the selection that used to
+   * ride this snapshot as `current` moved into the uiSession service — resolve
+   * it with `currentSessionId()` (`session-current.ts`) instead.
+   */
+  ids?: readonly string[]
   byId: Record<string, SidebarSessionSummary>
   /** Direct durable catalogs keyed by their selected parent address. */
   subagentsByParent?: Readonly<Record<string, SidebarSubagentCatalog>>

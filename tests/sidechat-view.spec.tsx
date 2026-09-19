@@ -15,6 +15,7 @@ import { SideChatView } from '../src/client/SideChatView.tsx'
 import { attachLocale } from '../src/client/locales.ts'
 import type { Context, SidebarSessionList } from '../src/context-types.ts'
 import type { SidebarTab } from '../src/client/state.ts'
+import { sessionList } from './session-list.ts'
 
 setupReactAct()
 
@@ -141,7 +142,7 @@ function viewProps(ctx: Context) {
 
 /** The sessions-list snapshot with one idle side thread bound to 'root'. */
 function threadStore(): ReturnType<typeof makeStore> {
-  return makeStore({
+  return makeStore(sessionList({
     current: 'root',
     byId: {
       root: { id: 'root', displayTitle: '主会话', running: false },
@@ -149,7 +150,7 @@ function threadStore(): ReturnType<typeof makeStore> {
     },
     subagentsByParent: {},
     jobsBySession: {},
-  })
+  }))
 }
 
 describe('SideChatView rendering', () => {

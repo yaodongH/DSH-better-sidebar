@@ -351,17 +351,25 @@ test('plugin mounts into the DSH shell and survives a built-in tab sweep', async
   // the guide lists at most 4 entries (`MAX_DESCRIBED_ENTRIES` in the host's
   // GuideBody) — a longer list drops every description and shows titles
   // alone. Shrink the enabled set through the plugin's OWN settings route
-  // (scratch-profile prefs only, never the user's) so three types stay
-  // enabled (files / sidechat / browser), then require the Files capsule to
-  // really grow its description line. This is the host-side proof of the
-  // rc.1 description restore: before it every entry was a title-only
-  // capsule, so no entry count could ever surface the text.
+  // (scratch-profile prefs only, never the user's) until at most four types
+  // stay enabled, then require the Files capsule to really grow its
+  // description line. This is the host-side proof of the rc.1 description
+  // restore: before it every entry was a title-only capsule, so no entry
+  // count could ever surface the text.
+  //
+  // DSH 0.1.6 ships its OWN built-in `terminal` tab type
+  // (@deepseek-ai/dsh-client-ui-sidebar-terminal, priority 'builtin') on the
+  // same kind the plugin takes over as an 'extension'. The tab system resumes
+  // the builtin when the extension leaves, so disabling the plugin's terminal
+  // no longer empties that guide entry — it hands it back to the host, and
+  // asserting `toHaveCount(0)` on the kind would be wrong. The disabled set
+  // therefore names types whose kind the host does not also ship.
   const settingsGet = await api.post(sidebarApi('settings.get'), { data: {} })
   expect(settingsGet.ok(), `settings.get: ${settingsGet.status()}`).toBe(true)
   const settingsGetBody = (await settingsGet.json()) as { value?: { tabsEnabled?: Record<string, boolean> } }
   const originalTabsEnabled = settingsGetBody.value?.tabsEnabled ?? {}
-  /** The types this check switches off (leaving three entries, i.e. ≤4). */
-  const shrunken = ['git', 'subagent', 'terminal'] as const
+  /** Types the host ships no builtin for, so disabling really empties the entry. */
+  const shrunken = ['git', 'subagent'] as const
   try {
     // Send the FULL map back (the route's patch is key-wise merged, so a
     // full map is correct whether the host merges or replaces).

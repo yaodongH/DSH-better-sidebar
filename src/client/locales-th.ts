@@ -365,6 +365,7 @@ export const th: Record<string, string> = {
   sideChatBlockExpandAria: 'ขยายอีก {hidden} บรรทัด',
   sideChatBlockSignal: 'ถูกยุตด้วยสัญญาณ: {signal}',
   sideChatBlockExitCode: 'รหัสออก {code}',
+  sideChatBlockNoExitCode: 'ไม่มีรหัสออก',
   sideChatBlockRunning: 'กำลังทำงาน',
   sideChatBlockFailed: 'ล้มเหลว',
   sideChatBlockDone: 'เสร็จสิ้น',

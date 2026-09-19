@@ -365,6 +365,7 @@ export const vi: Record<string, string> = {
   sideChatBlockExpandAria: 'Mở rộng thêm {hidden} dòng',
   sideChatBlockSignal: 'Kết thúc bởi tín hiệu: {signal}',
   sideChatBlockExitCode: 'Mã thoát {code}',
+  sideChatBlockNoExitCode: 'không có mã thoát',
   sideChatBlockRunning: 'Đang chạy',
   sideChatBlockFailed: 'Thất bại',
   sideChatBlockDone: 'Hoàn tất',
