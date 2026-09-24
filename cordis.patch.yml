@@ -44,6 +44,6 @@
 # it, and no runtime singleton guard is added. Same-id manual duplicates still
 # fail loudly at the loader as before.
 - insert:
-    - id: better-sidebar
+    - id: dsh-better-sidebar
       name: 'dsh-better-sidebar'
-      disabled: !!js "[...ctx.loader.entries()].some((e) => e.options.name === 'dsh-better-sidebar' && e.options.id !== 'better-sidebar' && !e.disabled)"
+      disabled: !!js "[...ctx.loader.entries()].some((e) => e.options.name === 'dsh-better-sidebar' && e.options.id !== 'dsh-better-sidebar' && !e.disabled)"

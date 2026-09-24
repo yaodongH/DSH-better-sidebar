@@ -52,6 +52,10 @@ if (g.window === undefined) {
   g.window = {
     clearTimeout: () => {},
     setTimeout: (_fn: () => void) => 0,
+    // primitives@0.1.7 probes pointer modality at module top level
+    // (`window.addEventListener('pointerdown', …)` when window exists).
+    addEventListener: () => () => {},
+    removeEventListener: () => {},
     innerWidth: 1024,
     innerHeight: 768,
     getComputedStyle: () => ({ getPropertyValue: () => '' }),

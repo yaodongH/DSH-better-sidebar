@@ -18,10 +18,12 @@ import { basename, dirname, extname, isAbsolute, join } from 'node:path'
 import type { IncomingMessage } from 'node:http'
 import type { Duplex } from 'node:stream'
 import { WebSocket, WebSocketServer } from 'ws'
+// Type-only: pulls the loader's `loader/volatile-update` event declaration into
+// the cordis Events map (erased at build time; the host bundle provides it).
+import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type { Context, SidebarHttpRequest, SidebarSessionEvent } from './context-types.ts'
 import {
   Config,
-  PrefsSchema,
   resolveSidebarConfig,
   SIDEBAR_PREFS_DEFAULTS,
   SIDEBAR_PREFS_NS,
@@ -799,22 +801,41 @@ export function apply(ctx: Context, config?: SidebarConfig): void {
     }
   }
   ctx.inject(['settings'], (sctx) => {
-    // DSH 0.1.2-alpha.2 validates namespaces at compile time
-    // (SettingsNamespaceInput); the 'dsh-better-sidebar' literal passes, so the
-    // runtime helper this used to call (settingsNamespace) is gone upstream.
+    // DSH 0.1.7 removed `settings.register`: the settings namespace now IS the
+    // plugin's composition entry (ns = entry id = 'dsh-better-sidebar'), whose
+    // form schema is this plugin's exported `Config` schema — the volatile
+    // PrefsSchema fields inside it (src/config.ts) are what the settings
+    // service projects, so no separate registration is needed here.
     const ns = SIDEBAR_PREFS_NS
-    // The structural settings mirror types `schema` as unknown, so the
-    // generic is not inferred here; the real service resolves it from the
-    // schemastery schema (PrefsSchema) — narrow the owner scope explicitly.
-    const scope = sctx.settings.register(ns, PrefsSchema) as {
-      get(): SidebarPrefs
-      watch(callback: (next: SidebarPrefs, prev: SidebarPrefs) => void): () => void
-    }
+    // The mount-time composition config also carries the preference fields
+    // (same merged schema), so the gates can evaluate before the settings
+    // service first observes this fiber as ACTIVE.
+    const mountPrefs = (config ?? {}) as Partial<SidebarPrefs>
     const viewOf = (): { value?: unknown; revision?: number } => {
       const descriptor = sctx.settings.describe({ redactSecrets: true }).find(candidate => candidate.ns === ns)
       return descriptor === undefined
         ? { value: undefined, revision: undefined }
         : { value: descriptor.value, revision: descriptor.revision }
+    }
+    // Reactive view over the live settings namespace: reads flow through the
+    // settings seam (describe projection, falling back to the mount config
+    // while the fiber has not been described yet); changes arrive through the
+    // loader's volatile-update event and the settings document revision bump.
+    const scope = {
+      get(): SidebarPrefs {
+        const view = viewOf()
+        const value = view.value
+        return value !== null && typeof value === 'object' && !Array.isArray(value)
+          ? { ...SIDEBAR_PREFS_DEFAULTS, ...mountPrefs, ...(value as Partial<SidebarPrefs>) }
+          : { ...SIDEBAR_PREFS_DEFAULTS, ...mountPrefs }
+      },
+      watch(callback: () => void): () => void {
+        const disposeVolatile = ctx.on('loader/volatile-update', () => callback())
+        const disposeDocument = ctx.on('settings/document-updated', (ns: string) => {
+          if (ns === SIDEBAR_PREFS_NS) callback()
+        })
+        return () => { disposeVolatile(); disposeDocument() }
+      },
     }
     // Mutual exclusion with the dsh-web-ui family right panel: the aionui
     // panel's provider choice (`aionui-panel.rightPanel`) is the authority.

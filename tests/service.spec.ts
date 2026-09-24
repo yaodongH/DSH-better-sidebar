@@ -11,6 +11,9 @@ if (g.window === undefined) {
     clearTimeout: () => {},
     setTimeout: (_fn: () => void) => 0,
     innerWidth: 1024,
+    // primitives@0.1.7 probes pointer modality at module top level.
+    addEventListener: () => () => {},
+    removeEventListener: () => {},
   }
 }
 if (g.localStorage === undefined) {

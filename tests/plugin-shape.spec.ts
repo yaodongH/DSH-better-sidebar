@@ -2,6 +2,14 @@ import { describe, expect, it } from 'vitest'
 import Loader from '@cordisjs/plugin-loader'
 import * as sidebar from '../src/index.ts'
 
+// DSH 0.1.7 volatile fields resolve to Volatile<T> live handles (get());
+// unwrap one so assertions compare the documented plain defaults.
+const plain = (v: unknown): unknown =>
+  v !== null && typeof v === 'object' && typeof (v as { get?: unknown }).get === 'function'
+    ? (v as { get: () => unknown }).get()
+    : v
+
+
 /**
  * Run the real namespace export through `Loader.unwrapExports`; a stray
  * default would discard `name`, `inject`, `Config`, and `apply`. Same guard
@@ -57,41 +65,42 @@ describe('dsh-better-sidebar plugin export shape', () => {
     const resolved = (PrefsSchema as unknown as {
       (input: Record<string, unknown> | undefined): Record<string, unknown>
     })(undefined)
-    expect(resolved.openByDefault).toBeUndefined()
-    expect(resolved.defaultWidthPercent).toBeUndefined()
-    expect(resolved.changesDiffFloat).toBeUndefined()
-    expect(resolved.autoOpenSubagent).toBe(true)
+    const value = (key: string): unknown => plain((resolved as Record<string, unknown>)[key])
+    expect(value('openByDefault')).toBeUndefined()
+    expect(value('defaultWidthPercent')).toBeUndefined()
+    expect(value('changesDiffFloat')).toBeUndefined()
+    expect(value('autoOpenSubagent')).toBe(true)
     // A new background job auto-opens the Jobs page too.
-    expect(resolved.autoOpenJobs).toBe(true)
+    expect(value('autoOpenJobs')).toBe(true)
     // The terminal tools default OFF (the feature is dormant until the user
     // enables it in the side card settings).
-    expect(resolved.agentTerminalTools).toBe(false)
+    expect(value('agentTerminalTools')).toBe(false)
     // The sidebar-open tool defaults OFF too (same dormant-until-enabled rule).
-    expect(resolved.agentOpenTools).toBe(false)
+    expect(value('agentOpenTools')).toBe(false)
     // The terminal font customizations default to the theme (empty family)
     // and 13px.
-    expect(resolved.terminalFontFamily).toBe('')
-    expect(resolved.terminalFontSize).toBe(13)
+    expect(value('terminalFontFamily')).toBe('')
+    expect(value('terminalFontSize')).toBe(13)
     // The position-compat scheme is declared WITHOUT a schema default so a
     // stored document that predates it resolves without the field — the
     // CLIENT parsePrefs then applies the conservative `auto` default (or
     // migrates the legacy boolean), which is exactly what makes old
     // documents migrate instead of silently flipping to a scheme. The
     // legacy strip keeps its schema default of 40px.
-    expect(resolved.titleBarScheme).toBeUndefined()
-    expect(resolved.titleBarPresetId).toBeUndefined()
-    expect(resolved.customCss).toBeUndefined()
-    expect(resolved.titleBarCompat).toBe(false)
-    expect(resolved.titleBarStripPx).toBe(40)
+    expect(value('titleBarScheme')).toBeUndefined()
+    expect(value('titleBarPresetId')).toBeUndefined()
+    expect(value('customCss')).toBeUndefined()
+    expect(value('titleBarCompat')).toBe(false)
+    expect(value('titleBarStripPx')).toBe(40)
     // The enable-switch maps resolve to {} (everything on) for old documents.
-    expect(resolved.tabsEnabled).toEqual({})
-    expect(resolved.viewersEnabled).toEqual({})
+    expect(value('tabsEnabled')).toEqual({})
+    expect(value('viewersEnabled')).toEqual({})
     // The separate file-window mode is the default (each file opens its own
     // tab; the merged editor-explorer is opt-in).
-    expect(resolved.editorExplorer).toBe(false)
+    expect(value('editorExplorer')).toBe(false)
     // The workspace fence (containment over the sidebar fs routes) defaults
     // ON — the safe default never depends on the stored document.
-    expect(resolved.workspaceFence).toBe(true)
+    expect(value('workspaceFence')).toBe(true)
     // A stored overridden value resolves through (the range contract is
     // enforced by the settings service on write); the new pref keeps its
     // default when the stored document predates it.
@@ -108,6 +117,7 @@ describe('dsh-better-sidebar plugin export shape', () => {
     // absent from a resolved document that never stored them.
     const { titleBarScheme, titleBarPresetId, customCss, ...schemaDefaults } = SIDEBAR_PREFS_DEFAULTS
     void titleBarScheme; void titleBarPresetId; void customCss
-    expect(overridden).toEqual({ ...schemaDefaults, openByDefault: false, defaultWidthPercent: 45, changesDiffFloat: true })
+    expect(Object.fromEntries(Object.entries(overridden).map(([k, v]) => [k, plain(v)])))
+      .toEqual({ ...schemaDefaults, openByDefault: false, defaultWidthPercent: 45, changesDiffFloat: true })
   })
 })

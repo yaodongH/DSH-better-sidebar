@@ -5,7 +5,7 @@
  * @module dsh-better-sidebar/config
  */
 
-import z from 'schemastery'
+import z from '@deepseek-ai/schemastery'
 import {
   TERMINAL_FONT_SIZE_DEFAULT,
   TERMINAL_FONT_SIZE_MAX,
@@ -60,7 +60,60 @@ export interface SidebarConfig {
   shellArgs?: string[]
 }
 
-/** Schemastery schema for the plugin configuration. */
+// DSH 0.1.7 projects the plugin's OWN `Config` schema into the settings form
+// for the composition entry (ns = entry id), and only fields under a
+// `.volatile()` ancestor become live-editable there — a separately registered
+// namespace (`settings.register`, removed upstream) no longer exists. The
+// user-facing preference fields therefore live inside the exported `Config`
+// schema, each marked volatile, and `PrefsSchema` stays as the typed view over
+// exactly those fields (client RPC keeps addressing ns 'dsh-better-sidebar').
+const PrefsFields = {
+  autoOpenSubagent: z.boolean().default(true).volatile(),
+  autoOpenJobs: z.boolean().default(true).volatile(),
+  agentTerminalTools: z.boolean().default(false).volatile(),
+  agentOpenTools: z.boolean().default(false).volatile(),
+  bottomPanelAutoTerminal: z.boolean().default(true).volatile(),
+  terminalFontFamily: z.string().default('').volatile(),
+  terminalFontSize: z.number().step(1).min(TERMINAL_FONT_SIZE_MIN).max(TERMINAL_FONT_SIZE_MAX).default(TERMINAL_FONT_SIZE_DEFAULT).volatile(),
+  editorExplorer: z.boolean().default(false).volatile(),
+  workspaceFence: z.boolean().default(true).volatile(),
+  terminalShell: z.string().default('').volatile(),
+  terminalShellArgs: z.string().default('').volatile(),
+  titleBarScheme: z.union([z.const('auto'), z.const('web'), z.const('preset'), z.const('custom')]).volatile(),
+  titleBarPresetId: z.string().volatile(),
+  customCss: z.string().volatile(),
+  titleBarCompat: z.boolean().default(false).volatile(),
+  titleBarStripPx: z.number().step(1).min(TITLE_BAR_STRIP_MIN).max(TITLE_BAR_STRIP_MAX).default(TITLE_BAR_STRIP_DEFAULT).volatile(),
+  htmlViewerNoSandbox: z.boolean().default(false).volatile(),
+  htmlViewerDefaultUnsafe: z.boolean().default(false).volatile(),
+  browserNoSandbox: z.boolean().default(false).volatile(),
+  browserInterceptLinks: z.boolean().default(true).volatile(),
+  browserInterceptHttp: z.boolean().default(true).volatile(),
+  browserInterceptHttps: z.boolean().default(false).volatile(),
+  browserAllowedLoopback: z.string().default('').volatile(),
+  // Per-feature enable switches are OPEN maps (any tab/viewer id, built-in or
+  // external): an absent key means enabled, so old documents resolve to {}
+  // (everything on) with no migration. Non-boolean values fail validation.
+  tabsEnabled: z.dict(z.boolean()).default({}).volatile(),
+  viewersEnabled: z.dict(z.boolean()).default({}).volatile(),
+  // Plugin-owned settings blobs (v0.12.0+) are an OPEN nested map: any
+  // descriptor id may carry any JSON-serializable values. This is the
+  // "settings seam" opening — without it the seam would drop third-party
+  // keys as unknown schema fields.
+  pluginSettings: z.dict(z.dict(z.any())).default({}).volatile(),
+}
+
+/** Schemastery schema for the user-facing preferences (validated by the settings service). */
+export const PrefsSchema: z = z.object(PrefsFields)
+
+/**
+ * Schemastery schema for the plugin configuration. Beyond the host limits the
+ * deployment may pin at mount, this carries the user-facing "Side card"
+ * preferences as volatile fields: DSH 0.1.7 reads this exported `Config` as
+ * the settings form schema for the plugin's composition entry, so the same
+ * fields are simultaneously the mount config and the live-editable settings
+ * namespace (ns = entry id, i.e. 'dsh-better-sidebar').
+ */
 export const Config: z<SidebarConfig> = z.object({
   readLimit: z.number().step(1).min(1).default(512 * 1024),
   mediaLimit: z.number().step(1).min(1).default(20 * 1024 * 1024),
@@ -70,6 +123,7 @@ export const Config: z<SidebarConfig> = z.object({
   reconnectGraceMs: z.number().step(1).min(0).default(30_000),
   shell: z.string().default(''),
   shellArgs: z.array(z.string()).default([]),
+  ...PrefsFields,
 })
 
 /** Fully defaulted sidebar host settings. */
@@ -107,39 +161,3 @@ export function resolveSidebarConfig(config: SidebarConfig | undefined): Resolve
 
 // ── User-facing "Side card" preferences ─────────────────────────────────────
 
-/** Schemastery schema for the user-facing preferences (validated by the settings service). */
-export const PrefsSchema: z<SidebarPrefs> = z.object({
-  autoOpenSubagent: z.boolean().default(true),
-  autoOpenJobs: z.boolean().default(true),
-  agentTerminalTools: z.boolean().default(false),
-  agentOpenTools: z.boolean().default(false),
-  bottomPanelAutoTerminal: z.boolean().default(true),
-  terminalFontFamily: z.string().default(''),
-  terminalFontSize: z.number().step(1).min(TERMINAL_FONT_SIZE_MIN).max(TERMINAL_FONT_SIZE_MAX).default(TERMINAL_FONT_SIZE_DEFAULT),
-  editorExplorer: z.boolean().default(false),
-  workspaceFence: z.boolean().default(true),
-  terminalShell: z.string().default(''),
-  terminalShellArgs: z.string().default(''),
-  titleBarScheme: z.union([z.const('auto'), z.const('web'), z.const('preset'), z.const('custom')]),
-  titleBarPresetId: z.string(),
-  customCss: z.string(),
-  titleBarCompat: z.boolean().default(false),
-  titleBarStripPx: z.number().step(1).min(TITLE_BAR_STRIP_MIN).max(TITLE_BAR_STRIP_MAX).default(TITLE_BAR_STRIP_DEFAULT),
-  htmlViewerNoSandbox: z.boolean().default(false),
-  htmlViewerDefaultUnsafe: z.boolean().default(false),
-  browserNoSandbox: z.boolean().default(false),
-  browserInterceptLinks: z.boolean().default(true),
-  browserInterceptHttp: z.boolean().default(true),
-  browserInterceptHttps: z.boolean().default(false),
-  browserAllowedLoopback: z.string().default(''),
-  // Per-feature enable switches are OPEN maps (any tab/viewer id, built-in or
-  // external): an absent key means enabled, so old documents resolve to {}
-  // (everything on) with no migration. Non-boolean values fail validation.
-  tabsEnabled: z.dict(z.boolean()).default({}),
-  viewersEnabled: z.dict(z.boolean()).default({}),
-  // Plugin-owned settings blobs (v0.12.0+) are an OPEN nested map: any
-  // descriptor id may carry any JSON-serializable values. This is the
-  // "settings seam" opening — without it the seam would drop third-party
-  // keys as unknown schema fields.
-  pluginSettings: z.dict(z.dict(z.any())).default({}),
-})

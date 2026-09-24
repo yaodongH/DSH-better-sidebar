@@ -17,7 +17,7 @@
  * editor tab type or suspending the sidebar therefore hides the row instead of
  * showing chips that open through the host OS.
  */
-import { IconCodeOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconCodeOutlineRegular } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { Context } from '../context-types.ts'
 import { revealPaths, type SidebarStore } from './state.ts'
 import { t } from './locales.ts'
@@ -86,7 +86,7 @@ export function SidebarProducedFiles(props: {
             title={path}
             onClick={() => { openInSidebar(path) }}
           >
-            <IconCodeOutline16 size={12} />
+            <IconCodeOutlineRegular size={12} />
             <span>{name}</span>
           </button>
         )

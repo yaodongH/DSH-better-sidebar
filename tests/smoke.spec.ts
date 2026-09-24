@@ -9,6 +9,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { tmpdir } from 'node:os'
 import { join, resolve as resolvePath } from 'node:path'
 import { SettingsConflictError, type SettingsNamespace } from '@deepseek-ai/dsh-settings'
+import { PrefsSchema, SIDEBAR_PREFS_NS } from '../src/config.ts'
 import { apply, mediaTypeForPath, wsCloseReasonOf } from '../src/index.ts'
 import { SidebarError } from '../src/wire.ts'
 import { encodeHtmlUrl } from '../src/html-route.ts'
@@ -828,28 +829,43 @@ describe('session cwd resolution over the API route', () => {
 })
 
 describe('side card settings routes', () => {
-  /** A minimal settings seam: register/describe/update with the revision guard. */
+  /**
+   * A minimal settings seam for the DSH 0.1.7 projection model: the settings
+   * namespace IS the plugin's composition entry, so the fake pre-creates the
+   * plugin's namespace the way the host would (schema = the exported
+   * `Config`'s volatile subset, here `PrefsSchema`) — the plugin no longer
+   * calls `settings.register` (removed upstream). `describe()` resolves
+   * schema defaults and unwraps the Volatile<T> handles volatile fields
+   * resolve to; `update()` keeps the revision guard.
+   */
   const createFakeSettings = (pre?: Record<string, Record<string, unknown>>) => {
     const namespaces = new Map<string, {
       schema: unknown
       value: Record<string, unknown> | undefined
       revision: number
     }>()
+    const unwrapVolatile = (v: unknown): unknown =>
+      v !== null && typeof v === 'object' && typeof (v as { get?: unknown }).get === 'function'
+        ? (v as { get: () => unknown }).get()
+        : v
+    namespaces.set(SIDEBAR_PREFS_NS, {
+      schema: PrefsSchema,
+      value: pre?.[SIDEBAR_PREFS_NS],
+      revision: 0,
+    })
     for (const [ns, value] of Object.entries(pre ?? {})) {
+      if (ns === SIDEBAR_PREFS_NS) continue
       namespaces.set(ns, { schema: (input: unknown) => input, value, revision: 0 })
     }
     const resolve = (entry: { schema: unknown; value: Record<string, unknown> | undefined }): unknown => {
       const schema = entry.schema as (input: unknown) => unknown
-      return entry.value === undefined ? schema(undefined) : schema(entry.value)
+      const raw = entry.value === undefined ? schema(undefined) : schema(entry.value)
+      if (raw === null || typeof raw !== 'object') return raw
+      return Object.fromEntries(
+        Object.entries(raw as Record<string, unknown>).map(([key, item]) => [key, unwrapVolatile(item)]),
+      )
     }
     return {
-      register(ns: string, schema: unknown) {
-        // Preserve a pre-seeded value: tests stage prefs through the `pre`
-        // map before the plugin mounts and registers the same namespace.
-        const existing = namespaces.get(ns)
-        namespaces.set(ns, { schema, value: existing?.value ?? undefined, revision: 0 })
-        return { get: () => ({}), watch: () => () => {}, update: async () => {}, replace: async () => {} }
-      },
       describe() {
         return [...namespaces.entries()].map(([ns, entry]) => ({
           ns,
@@ -885,7 +901,8 @@ describe('side card settings routes', () => {
         if (deps.includes('settings') && settings !== undefined) callback({ settings })
         return () => {}
       },
-      // The session/agent event feeds: nothing emits in these tests.
+      // The session/agent event feeds: nothing emits in these tests (the
+      // plugin's volatile-update listener registers but never fires).
       on: () => () => {},
       // No jobs/agents services: the jobs routes degrade to a 503.
       get: () => undefined,
@@ -1146,21 +1163,21 @@ describe('agent terminal tool gating', () => {
     let disposed = 0
     // The tools currently registered (registered minus disposed).
     const live = (): number => registered - disposed
-    // A ref container: the watch callback is only assigned inside a closure,
-    // which TypeScript's control-flow analysis ignores (the bare variable
-    // would narrow to null and refuse the optional call).
-    const watcherRef: { current: (() => void) | null } = { current: null }
+    const volatileWatchers: Array<() => void> = []
+    const fireVolatileUpdate = (): void => { for (const callback of volatileWatchers) callback() }
     let enabled = false
+    // DSH 0.1.7: the plugin derives its reactive view from describe() and the
+    // loader's volatile-update event (register is gone), so the fake serves
+    // the namespace projection and the test fires the captured listener.
     const settings = {
-      register() {
-        return {
-          get: () => ({ agentTerminalTools: enabled }),
-          watch: (callback: () => void) => { watcherRef.current = callback; return () => {} },
-          update: async () => {},
-          replace: async () => {},
-        }
-      },
-      describe: () => [],
+      describe: () => [
+        {
+          ns: 'dsh-better-sidebar',
+          value: { agentTerminalTools: enabled },
+          applies: 'live' as const,
+          revision: enabled ? 1 : 0,
+        },
+      ],
       async update() {},
     }
     const ctx = {
@@ -1176,8 +1193,12 @@ describe('agent terminal tool gating', () => {
         if (deps.includes('settings')) callback({ settings })
         return () => {}
       },
-      // The session/agent event feeds: nothing emits in these tests.
-      on: () => () => {},
+      // The session/agent event feeds: capture the plugin's
+      // loader/volatile-update listener so the test can fire it.
+      on: (event: string, callback: () => void) => {
+        if (event === 'loader/volatile-update') volatileWatchers.push(callback)
+        return () => {}
+      },
       // No jobs/agents services: the jobs routes degrade to a 503.
       get: () => undefined,
     }
@@ -1186,18 +1207,18 @@ describe('agent terminal tool gating', () => {
     expect(live()).toBe(0)
     // Flipping the setting on registers all eight tools.
     enabled = true
-    watcherRef.current?.()
+    fireVolatileUpdate()
     expect(live()).toBe(8)
     expect(disposed).toBe(0)
     // Flipping it back off unregisters them (and releases any agent terminals).
     enabled = false
-    watcherRef.current?.()
+    fireVolatileUpdate()
     expect(live()).toBe(0)
     expect(disposed).toBe(8)
     // And a redundant toggle registers them fresh (no double-registration per
     // flip: the guard only skips when the tools are already live).
     enabled = true
-    watcherRef.current?.()
+    fireVolatileUpdate()
     expect(live()).toBe(8)
     expect(registered).toBe(16)
   })
@@ -1208,18 +1229,19 @@ describe('agent sidebar-open tool gating', () => {
     let registered = 0
     let disposed = 0
     const live = (): number => registered - disposed
-    const watcherRef: { current: (() => void) | null } = { current: null }
+    const volatileWatchers: Array<() => void> = []
+    const fireVolatileUpdate = (): void => { for (const callback of volatileWatchers) callback() }
     let enabled = false
+    // Same projection shape as the terminal gating test above.
     const settings = {
-      register() {
-        return {
-          get: () => ({ agentOpenTools: enabled, tabsEnabled: {} }),
-          watch: (callback: () => void) => { watcherRef.current = callback; return () => {} },
-          update: async () => {},
-          replace: async () => {},
-        }
-      },
-      describe: () => [],
+      describe: () => [
+        {
+          ns: 'dsh-better-sidebar',
+          value: { agentOpenTools: enabled, tabsEnabled: {} },
+          applies: 'live' as const,
+          revision: enabled ? 1 : 0,
+        },
+      ],
       async update() {},
     }
     const ctx = {
@@ -1235,8 +1257,12 @@ describe('agent sidebar-open tool gating', () => {
         if (deps.includes('settings')) callback({ settings })
         return () => {}
       },
-      // The session/agent event feeds: nothing emits in these tests.
-      on: () => () => {},
+      // The session/agent event feeds: capture the plugin's
+      // loader/volatile-update listener so the test can fire it.
+      on: (event: string, callback: () => void) => {
+        if (event === 'loader/volatile-update') volatileWatchers.push(callback)
+        return () => {}
+      },
       get: () => undefined,
     }
     apply(ctx as never)
@@ -1244,17 +1270,17 @@ describe('agent sidebar-open tool gating', () => {
     expect(live()).toBe(0)
     // Flipping the setting on registers the single sidebar_open tool.
     enabled = true
-    watcherRef.current?.()
+    fireVolatileUpdate()
     expect(live()).toBe(1)
     expect(disposed).toBe(0)
     // Flipping it back off unregisters it (and drains the undelivered queue).
     enabled = false
-    watcherRef.current?.()
+    fireVolatileUpdate()
     expect(live()).toBe(0)
     expect(disposed).toBe(1)
     // And a redundant toggle registers it fresh (no double-registration).
     enabled = true
-    watcherRef.current?.()
+    fireVolatileUpdate()
     expect(live()).toBe(1)
     expect(registered).toBe(2)
   })

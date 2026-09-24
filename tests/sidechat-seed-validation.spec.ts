@@ -19,7 +19,7 @@ import { buildSidechatInheritance } from '../src/sidechat-core.ts'
 
 /** One live-style event with the surface marker message events carry, and
  *  the REAL message shapes the validator demands (id/role/source/content;
- *  tool/result messages carry role 'user' + one tool-result block). */
+ *  tool/result messages carry role 'tool' + one tool-result block — DSH 0.1.7 gave tool results their own role). */
 function ev(type: string, seq: number, data: Record<string, unknown>): SidebarSessionEvent {
   const event: SidebarSessionEvent = { type, seq, time: seq * 1000, data }
   if (type === 'user/message' || type === 'assistant/message' || type === 'tool/result') {
@@ -185,7 +185,9 @@ describe('sidechat seed fork markers vs the reconstructed inbox', () => {
       turn: 2, step: 1,
       message: {
         id: 'm-r',
-        role: 'user',
+        role: 'tool',
+        // DSH 0.1.7 hoisted the tool call id onto the message itself.
+        toolCallId: 'c1',
         content: [{ type: 'tool-result', toolCallId: 'c1', content: [{ type: 'text', text: 'ok' }] }],
         source: { kind: 'tool', callId: 'c1' },
       },

@@ -153,13 +153,21 @@ function admitFollowup(agent: Agent, blocks: ContentBlock[]): void {
  * log therefore records two user/message events (injection, then question)
  * instead of one wrapped blob: the transcript shows the question as a user
  * bubble and collapses the injection as a context row. The injection source
- * is stamped `kind: 'plugin'` so recognition is structural; its text still
+ * is stamped with this plugin's own producer kind (registered into the
+ * merge-extensible MessageSourceMap below — DSH 0.1.7 removed the shared
+ * `plugin` catch-all) so recognition is structural; its text still
  * opens with SIDE_BOUNDARY_PREFIX, keeping boundaryDelivered intact.
  */
+declare module '@deepseek-ai/dsh-llm' {
+  interface MessageSourceMap {
+    'dsh-better-sidebar': { kind: 'dsh-better-sidebar'; plugin: string }
+  }
+}
+
 function admitFirstContact(agent: Agent, injectionText: string, question: string): void {
   agent.inject(createUserMessage({
     content: textPrompt(injectionText),
-    source: { kind: 'plugin', plugin: SIDE_INJECTION_PLUGIN },
+    source: { kind: 'dsh-better-sidebar', plugin: SIDE_INJECTION_PLUGIN },
   }))
   admitFollowup(agent, textPrompt(question))
 }
